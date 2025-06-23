@@ -1,17 +1,21 @@
 using UnityEngine;
 
-// Атрибут CreateAssetMenu дозволяє створювати об'єкти цього типу через меню Assets/Create
+// Додаємо перелік, щоб розрізняти предмети
+public enum ItemType { Resource, Tool, Consumable }
+
 [CreateAssetMenu(fileName = "New Item", menuName = "Inventory/Item")]
 public class Item : ScriptableObject
 {
-    [Tooltip("Унікальна назва предмета.")]
-    public string itemName = "New Item";
-    [Tooltip("Опис предмета.")]
+    [Header("Основна інформація")]
+    public string itemName = "Новий предмет";
     [TextArea(3, 5)]
-    public string description = "Опис предмета.";
-    [Tooltip("Іконка, що відображається в інвентарі.")]
+    public string description = "Опис цього предмету.";
     public Sprite icon = null;
-    [Tooltip("Максимальна кількість предмета в одному слоті інвентарю.")]
-    [Range(1, 99)] // Обмеження до 99, як ви просили
+    [Range(1, 99)]
     public int maxStack = 1;
+    public ItemType itemType = ItemType.Resource;
+
+    [Header("Налаштування Інструменту (якщо це інструмент)")]
+    [Tooltip("Шкода, яку інструмент наносить ресурсам. Ігнорується, якщо тип предмету - не Tool.")]
+    public float damage = 10f;
 }

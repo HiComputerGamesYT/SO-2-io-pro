@@ -1,65 +1,51 @@
 using UnityEngine;
 
-// Цей скрипт буде прикріплюватися до GameObject'ів, які представляють предмети на карті
-// І які гравець може підібрати.
+// Цей компонент треба додавати до префабів предметів, що лежать на землі.
+[RequireComponent(typeof(SpriteRenderer))]
 public class WorldItem : MonoBehaviour
 {
-    [Tooltip("Визначення предмета (ScriptableObject), який буде підібрано.")]
-    public Item itemData; // Сюди перетягніть ваш Asset "Item" (наприклад, StoneItem)
-    [Tooltip("Кількість цього предмета, яка буде підібрана.")]
+    [Header("Дані Предмету")]
+    [Tooltip("Дані предмета (ScriptableObject), який представляє цей об'єкт.")]
+    public Item itemData;
+
+    [Tooltip("Кількість предметів в цьому стаку.")]
     [Range(1, 99)]
     public int quantity = 1;
 
-    [Tooltip("Радіус зони підбору предмета.")]
-    public float pickupRadius = 1f;
-
-    // Сховище для посилання на InventoryManager
-    private InventoryManager inventoryManager;
-
-    void Awake()
+    void Start()
     {
-        // Переконайтеся, що на об'єкті є Collider2D і він є тригером.
-        // Якщо його немає, додамо його автоматично.
-        Collider2D col = GetComponent<Collider2D>();
-        if (col == null)
+        // Автоматично встановлюємо спрайт на основі даних з Item, якщо він не встановлений вручну.
+        SpriteRenderer sr = GetComponent<SpriteRenderer>();
+        if (sr.sprite == null && itemData != null)
         {
-            col = gameObject.AddComponent<CircleCollider2D>(); // Можна BoxCollider2D, залежить від спрайта
-            (col as CircleCollider2D).radius = pickupRadius;
-        }
-        col.isTrigger = true; // Робимо колайдер тригером для детекції входу
-
-        // Знайти InventoryManager у сцені
-        inventoryManager = FindObjectOfType<InventoryManager>();
-        if (inventoryManager == null)
-        {
-            Debug.LogError("WorldItem: InventoryManager не знайдено в сцені. Підбір предметів не працюватиме.");
+            sr.sprite = itemData.icon;
         }
     }
 
-    // Метод для підбору предмета
+    /// <summary>
+    /// Цей метод викликається ззовні (наприклад, гравцем), щоб підібрати предмет.
+    /// </summary>
     public void PickUp()
     {
-        if (inventoryManager != null && itemData != null)
+        if (InventoryManager.instance == null)
         {
-            // Спробувати додати предмет до інвентарю
-            bool addedSuccessfully = inventoryManager.AddItem(itemData, quantity);
-
-            if (addedSuccessfully)
-            {
-                Debug.Log($"Підібрано {quantity} x {itemData.itemName}.");
-                Destroy(gameObject); // Знищуємо об'єкт предмета зі світу
-            }
-            else
-            {
-                Debug.Log($"Не вдалося підібрати {itemData.itemName}. Інвентар заповнений.");
-            }
+            Debug.LogError("Не вдалося знайти InventoryManager.instance! Предмет не може бути підібраний.");
+            return;
         }
-    }
 
-    // Візуалізація радіуса підбору в редакторі
-    void OnDrawGizmos()
-    {
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(transform.position, pickupRadius);
+        // Намагаємось додати предмет до інвентарю гравця.
+        bool wasPickedUp = InventoryManager.instance.AddItem(itemData, quantity);
+
+        // Якщо предмет було успішно додано (повністю), знищуємо його об'єкт зі світу.
+        if (wasPickedUp)
+        {
+            Destroy(gameObject);
+        }
+        else
+        {
+            // Якщо інвентар заповнений, предмет не підбирається і залишається на землі.
+            Debug.Log("Інвентар заповнений! Неможливо підібрати " + itemData.itemName);
+            // Тут можна додати звук або візуальний ефект, який покаже гравцю, що інвентар повний.
+        }
     }
 }
