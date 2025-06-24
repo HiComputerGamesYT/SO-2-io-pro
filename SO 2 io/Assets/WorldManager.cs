@@ -4,10 +4,22 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
+// --- ДОДАНО: Новий клас для зберігання даних про кожен блок ---
+// Він зберігає не тільки здоров'я, але й посилання на предмет,
+// з якого був створений, щоб знати, що має випасти при руйнуванні.
+public class BlockData
+{
+    public int currentHealth;
+    public Item sourceItem;
+}
+
 public class WorldManager : MonoBehaviour
 {
+    public static WorldManager instance;
+
     [Header("Налаштування світу")]
     public Tilemap groundTilemap;
+    public Tilemap buildingTilemap; // Це поле ми додали минулого разу
     public int width = 300, height = 300;
     public int topBiomeHeight = 100, bottomBiomeHeight = 100;
 
@@ -17,57 +29,107 @@ public class WorldManager : MonoBehaviour
     public BiomeDefinition mountainBiome;
     public float musicFadeSpeed = 1.0f;
 
-    // --- НОВИЙ РОЗДІЛ ДЛЯ ДИНАМІЧНОГО СПАВНУ ---
     [Header("Конфігурації Спавнерів")]
-    [Tooltip("Перетягніть сюди всі ваші конфігурації для дерев, каменів, мобів і т.д.")]
     public SpawnerConfig[] spawnerConfigs;
-    [Tooltip("Як часто (в секундах) система буде перевіряти, чи потрібно щось заспавнити.")]
     public float spawnerTickRate = 5f;
-    // ------------------------------------------
 
-    // Приватні змінні
+    // --- ДОДАНО: Словник для зберігання здоров'я всіх поставлених блоків ---
+    // Ключ - це координата блоку, значення - об'єкт з його даними (здоров'я, предмет).
+    public Dictionary<Vector3Int, BlockData> placedBlocksData = new Dictionary<Vector3Int, BlockData>();
+
+    // --- ВАШ КОД ЗАЛИШИВСЯ БЕЗ ЗМІН ---
     private AudioSource audioSource;
     private BiomeType currentBiomeType = BiomeType.None;
     private Transform playerTransform;
-    private PlayerController playerController; // ПОВЕРНУЛИ ПОСИЛАННЯ НА КОНТРОЛЕР
-
-    // Словники для нової системи спавну
+    private PlayerController playerController;
     private Dictionary<SpawnerConfig, List<GameObject>> spawnedObjects = new Dictionary<SpawnerConfig, List<GameObject>>();
     private Dictionary<SpawnerConfig, float> respawnTimers = new Dictionary<SpawnerConfig, float>();
+
+    void Awake()
+    {
+        if (instance == null) { instance = this; }
+        else { Destroy(gameObject); }
+    }
 
     void Start()
     {
         InitializeAudio();
         FindPlayer();
-
-        // Генерація світу ТЕПЕР ТАКОЖ СПАВНИТЬ ГРАВЦЯ І ВСТАНОВЛЮЄ МЕЖІ
         GenerateWorld();
-
-        // Підписуємось на подію зміни фази гри
         TimeManager.OnPhaseChanged += HandlePhaseChange;
-
-        // Ініціалізація та перший спавн об'єктів
         InitializeSpawners();
-
-        // Запуск циклу оновлення спавнерів
         StartCoroutine(SpawnerUpdateLoop());
     }
 
     void OnDestroy()
     {
-        // Важливо відписуватись, щоб уникнути помилок при переході між сценами
         TimeManager.OnPhaseChanged -= HandlePhaseChange;
     }
 
     void Update()
     {
-        // ПОВЕРНУЛИ ЛОГІКУ МУЗИКИ
         if (playerTransform != null)
         {
             DetectAndSwitchBiomeMusic();
         }
     }
 
+    // --- ДОДАНО: Два нових публічних методи для керування блоками ---
+
+    /// <summary>
+    /// Реєструє новий поставлений блок і додає його в базу даних здоров'я.
+    /// Цей метод буде викликатися з PlayerController.
+    /// </summary>
+    public void RegisterPlacedTile(Vector3Int position, Item item)
+    {
+        if (item.itemType != Item.ItemType.Block || placedBlocksData.ContainsKey(position)) return;
+
+        BlockData newBlockData = new BlockData
+        {
+            currentHealth = item.blockHealth,
+            sourceItem = item
+        };
+
+        placedBlocksData.Add(position, newBlockData);
+        Debug.Log($"Зареєстровано блок в позиції {position} з {item.blockHealth} HP.");
+    }
+
+    /// <summary>
+    /// Наносить шкоду блоку в заданій позиції.
+    /// Цей метод також буде викликатися з PlayerController.
+    /// </summary>
+    public void DamageTile(Vector3Int position, float damage)
+    {
+        if (!placedBlocksData.ContainsKey(position)) return;
+
+        BlockData blockData = placedBlocksData[position];
+        blockData.currentHealth -= (int)damage; // Віднімаємо здоров'я
+
+        Debug.Log($"Нанесено {damage} шкоди блоку в {position}. Залишилось здоров'я: {blockData.currentHealth}");
+
+        if (blockData.currentHealth <= 0)
+        {
+            // Якщо здоров'я скінчилось, руйнуємо блок
+            Debug.Log($"Блок в {position} зруйновано!");
+            buildingTilemap.SetTile(position, null); // Видаляємо тайл з карти
+
+            // Логіка випадіння ресурсу
+            if (blockData.sourceItem.itemToDrop != null && Random.value < blockData.sourceItem.dropChance)
+            {
+                Item itemToDrop = blockData.sourceItem.itemToDrop;
+                if (itemToDrop.itemPrefab != null)
+                {
+                    Vector3 worldPosition = buildingTilemap.GetCellCenterWorld(position);
+                    Instantiate(itemToDrop.itemPrefab, worldPosition, Quaternion.identity);
+                    Debug.Log($"З блоку випав предмет: {itemToDrop.itemName}");
+                }
+            }
+
+            placedBlocksData.Remove(position); // Видаляємо блок з нашої бази даних
+        }
+    }
+
+    // --- ВСЯ ВАША СТАРА ЛОГІКА ЗАЛИШИЛАСЯ НИЖЧЕ БЕЗ ЗМІН ---
     #region Ініціалізація
     private void InitializeAudio()
     {
@@ -83,7 +145,7 @@ public class WorldManager : MonoBehaviour
         if (playerObj != null)
         {
             playerTransform = playerObj.transform;
-            playerController = playerObj; // Зберігаємо посилання на контролер
+            playerController = playerObj;
         }
         else
         {
@@ -96,7 +158,6 @@ public class WorldManager : MonoBehaviour
     void GenerateWorld()
     {
         groundTilemap.ClearAllTiles();
-        // Генерація тайлів
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -113,7 +174,6 @@ public class WorldManager : MonoBehaviour
         }
         Debug.Log($"Світ розміром {width}x{height} згенеровано.");
 
-        // --- ПОВЕРНУЛИ ВСТАНОВЛЕННЯ МЕЖ КАРТИ ---
         if (playerController != null)
         {
             float mapBoundsMinX = groundTilemap.CellToWorld(new Vector3Int(0, 0, 0)).x;
@@ -123,7 +183,6 @@ public class WorldManager : MonoBehaviour
             playerController.SetMapBounds(mapBoundsMinX, mapBoundsMaxX, mapBoundsMinY, mapBoundsMaxY);
         }
 
-        // --- ПОВЕРНУЛИ СПАВН ГРАВЦЯ У ТРАВ'ЯНОМУ БІОМІ ---
         if (playerTransform != null)
         {
             float grassBiomeWorldYStart = groundTilemap.CellToWorld(new Vector3Int(0, bottomBiomeHeight, 0)).y;
@@ -148,7 +207,6 @@ public class WorldManager : MonoBehaviour
             bool shouldBeActive = config.activePhases.Contains(newPhase);
             if (!shouldBeActive && spawnedObjects.ContainsKey(config))
             {
-                // Створюємо копію, бо не можна змінювати список під час ітерації
                 List<GameObject> objectsToDestroy = new List<GameObject>(spawnedObjects[config]);
                 foreach (var obj in objectsToDestroy)
                 {

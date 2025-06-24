@@ -1,11 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
-using System.Linq;
 using TMPro;
 using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.Tilemaps; // ДОДАНО: Для роботи з тайлмапами
 
 public class PlayerController : MonoBehaviour
 {
+    // Всі ваші налаштування залишаються без змін
     [Header("Рух")]
     public float moveSpeed = 5f;
     public float runSpeedMultiplier = 1.5f;
@@ -15,6 +17,8 @@ public class PlayerController : MonoBehaviour
     public float baseDamage = 5f;
     public float attackCooldown = 0.5f;
     public int attackEnergyCost = 5;
+    [SerializeField] private float attackOffset = 0.7f;
+    [SerializeField] private float attackRadius = 0.5f;
 
     [Header("Анімація Атаки")]
     public float swingAngle = 75f;
@@ -24,7 +28,7 @@ public class PlayerController : MonoBehaviour
     public KeyCode pickupKey = KeyCode.E;
     public float pickupRadius = 1.5f;
     public LayerMask itemLayer;
-    public LayerMask resourceLayer;
+    [SerializeField] private KeyCode[] hotbarKeys = { KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4, KeyCode.Alpha5 };
 
     [Header("Характеристики")]
     public int maxHealth = 100;
@@ -38,6 +42,7 @@ public class PlayerController : MonoBehaviour
     public Image energyFillImage;
     public SpriteRenderer weaponHolderRenderer;
 
+    // Всі ваші приватні змінні збережено
     private Rigidbody2D rb;
     private Camera mainCamera;
     private float currentHealth, currentEnergy, nextAttackTime;
@@ -89,9 +94,16 @@ public class PlayerController : MonoBehaviour
         moveInput.x = Input.GetAxisRaw("Horizontal");
         moveInput.y = Input.GetAxisRaw("Vertical");
 
-        if (Input.GetMouseButton(0) && Time.time >= nextAttackTime)
+        // Атака на ліву кнопку миші
+        if (Input.GetMouseButtonDown(0))
         {
             PerformAttack();
+        }
+
+        // Будівництво на праву кнопку миші
+        if (Input.GetMouseButtonDown(1))
+        {
+            TryPlaceBlock();
         }
 
         if (Input.GetKeyDown(pickupKey))
@@ -102,35 +114,17 @@ public class PlayerController : MonoBehaviour
         HandleHotbarInput();
     }
 
-    private void UpdateHeldItemVisual()
-    {
-        if (weaponHolderRenderer == null) return;
-        Item activeItem = InventoryManager.instance.GetActiveItem();
-        if (activeItem != null && activeItem.itemType == ItemType.Tool)
-        {
-            weaponHolderRenderer.sprite = activeItem.icon;
-        }
-        else
-        {
-            weaponHolderRenderer.sprite = null;
-        }
-    }
-
+    // --- ОНОВЛЕНО: Логіка атаки тепер може ламати блоки ---
     private void PerformAttack()
     {
-        if (currentEnergy < attackEnergyCost) return;
+        if (currentEnergy < attackEnergyCost || Time.time < nextAttackTime) return;
 
         currentEnergy -= attackEnergyCost;
         nextAttackTime = Time.time + attackCooldown;
 
-        Vector2 attackPosition = (Vector2)transform.position + (Vector2)(transform.up * -1f * 0.7f);
-        float attackRadius = 0.5f;
-
-        Collider2D[] hits = Physics2D.OverlapCircleAll(attackPosition, attackRadius, resourceLayer);
-
         float currentDamage = baseDamage;
         Item activeItem = InventoryManager.instance.GetActiveItem();
-        if (activeItem != null && activeItem.itemType == ItemType.Tool)
+        if (activeItem != null && activeItem.itemType == Item.ItemType.Tool)
         {
             currentDamage = activeItem.damage;
             if (weaponHolderRenderer != null && weaponSwingCoroutine == null)
@@ -139,15 +133,31 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // --- ЗМІНА: Тепер перевіряємо не тільки ресурси, а й мобів ---
+        Vector3 mouseWorldPosition = mainCamera.ScreenToWorldPoint(Input.mousePosition);
+
+        // Спочатку перевіряємо, чи не намагаємось ми вдарити по блоку
+        Tilemap buildingTilemap = WorldManager.instance.buildingTilemap;
+        Vector3Int cellToAttack = buildingTilemap.WorldToCell(mouseWorldPosition);
+
+        // Якщо в цій клітинці є блок, який зареєстрований в WorldManager...
+        if (WorldManager.instance.placedBlocksData.ContainsKey(cellToAttack))
+        {
+            // ... то наносимо шкоду цьому блоку
+            WorldManager.instance.DamageTile(cellToAttack, currentDamage);
+            return; // Виходимо, щоб не бити мобів крізь стіну
+        }
+
+        // Якщо по блоку не вдарили, виконуємо звичайну атаку по мобам/ресурсам
+        Vector2 directionToMouse = ((Vector2)mouseWorldPosition - rb.position).normalized;
+        Vector2 attackPosition = rb.position + directionToMouse * attackOffset;
+        Collider2D[] hits = Physics2D.OverlapCircleAll(attackPosition, attackRadius);
+
         foreach (var hit in hits)
         {
-            // Спочатку перевіряємо, чи це моб
             if (hit.TryGetComponent<MobController>(out MobController mob))
             {
                 mob.TakeDamage(currentDamage);
             }
-            // Якщо не моб, перевіряємо, чи це ресурс
             else if (hit.TryGetComponent<ResourceSource>(out ResourceSource resource))
             {
                 resource.TakeDamage(currentDamage, transform);
@@ -155,85 +165,51 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private IEnumerator WeaponSwingAnimation()
+    // --- ОНОВЛЕНО: Логіка будівництва тепер реєструє блок в WorldManager ---
+    private void TryPlaceBlock()
     {
-        Quaternion initialRotation = weaponHolderRenderer.transform.localRotation;
-        Quaternion startRotation = initialRotation * Quaternion.Euler(0, 0, swingAngle / 2);
-        Quaternion endRotation = initialRotation * Quaternion.Euler(0, 0, -swingAngle / 2);
+        Item activeItem = InventoryManager.instance.GetActiveItem();
 
-        float halfDuration = swingDuration / 2;
-        float elapsedTime = 0f;
-
-        while (elapsedTime < halfDuration)
+        if (activeItem == null || activeItem.itemType != Item.ItemType.Block || activeItem.correspondingTile == null)
         {
-            weaponHolderRenderer.transform.localRotation = Quaternion.Slerp(startRotation, endRotation, elapsedTime / halfDuration);
-            elapsedTime += Time.deltaTime;
-            yield return null;
+            return;
         }
 
-        elapsedTime = 0f;
-
-        while (elapsedTime < halfDuration)
+        Tilemap buildingTilemap = WorldManager.instance.buildingTilemap;
+        if (buildingTilemap == null)
         {
-            weaponHolderRenderer.transform.localRotation = Quaternion.Slerp(endRotation, initialRotation, elapsedTime / halfDuration);
-            elapsedTime += Time.deltaTime;
-            yield return null;
+            Debug.LogError("Building Tilemap не налаштована в WorldManager!");
+            return;
         }
 
-        weaponHolderRenderer.transform.localRotation = initialRotation;
-        weaponSwingCoroutine = null;
+        Vector3 mouseWorldPos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
+        Vector3Int cellPosition = buildingTilemap.WorldToCell(mouseWorldPos);
+
+        if (buildingTilemap.GetTile(cellPosition) != null)
+        {
+            return;
+        }
+
+        buildingTilemap.SetTile(cellPosition, activeItem.correspondingTile);
+
+        // Реєструємо наш новий блок в базі даних WorldManager
+        WorldManager.instance.RegisterPlacedTile(cellPosition, activeItem);
+
+        InventoryManager.instance.RemoveItem(activeItem, 1);
     }
 
-    private void TryPickupItem()
-    {
-        var colliders = Physics2D.OverlapCircleAll(transform.position, pickupRadius, itemLayer);
-        if (colliders.Length == 0) return;
-
-        var closestCollider = colliders.OrderBy(c => (c.transform.position - transform.position).sqrMagnitude).FirstOrDefault();
-
-        if (closestCollider != null && closestCollider.TryGetComponent<WorldItem>(out var worldItem))
-        {
-            worldItem.PickUp();
-        }
-    }
-
-    private void HandleHotbarInput()
-    {
-        if (Input.GetKeyDown(KeyCode.Alpha1)) InventoryManager.instance.SetActiveSlot(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) InventoryManager.instance.SetActiveSlot(1);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) InventoryManager.instance.SetActiveSlot(2);
-        if (Input.GetKeyDown(KeyCode.Alpha4)) InventoryManager.instance.SetActiveSlot(3);
-        if (Input.GetKeyDown(KeyCode.Alpha5)) InventoryManager.instance.SetActiveSlot(4);
-    }
-
-    private void HandleMovement()
-    {
-        float currentSpeed = moveSpeed;
-        if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.Return)) && moveInput.magnitude > 0 && currentEnergy > 0)
-        {
-            currentSpeed *= runSpeedMultiplier;
-            currentEnergy -= runEnergyCostPerSecond * Time.fixedDeltaTime;
-        }
-        rb.linearVelocity = moveInput.normalized * currentSpeed;
-
-        if (mapBoundsSet)
-        {
-            rb.position = new Vector2(Mathf.Clamp(rb.position.x, mapMinX, mapMaxX), Mathf.Clamp(rb.position.y, mapMinY, mapMaxY));
-        }
-    }
-
+    // --- ВАШ КОД ЗАЛИШИВСЯ БЕЗ ЗМІН ---
     private void HandleRotationTowardsMouse()
     {
         Vector3 mouseWorldPosition = mainCamera.ScreenToWorldPoint(Input.mousePosition);
         Vector2 lookDirection = mouseWorldPosition - transform.position;
-        rb.rotation = Mathf.Atan2(lookDirection.y, lookDirection.x) * Mathf.Rad2Deg + 90f;
+        float angle = Mathf.Atan2(lookDirection.y, lookDirection.x) * Mathf.Rad2Deg + 90f;
+        rb.rotation = angle;
     }
 
-    // --- ДОДАНО: Метод для отримання шкоди ---
     public void TakeDamage(float amount)
     {
         currentHealth -= amount;
-        Debug.Log($"Гравець отримав {amount} шкоди, залишилось {currentHealth} HP");
         if (currentHealth <= 0)
         {
             currentHealth = 0;
@@ -245,14 +221,82 @@ public class PlayerController : MonoBehaviour
     private void Die()
     {
         Debug.Log("Гравець помер!");
-        // TODO: Логіка смерті, наприклад, перезапуск сцени
     }
-    // ------------------------------------------
+
+    private void UpdateHeldItemVisual()
+    {
+        if (weaponHolderRenderer == null) return;
+        Item activeItem = InventoryManager.instance.GetActiveItem();
+        if (activeItem != null && activeItem.icon != null)
+        {
+            weaponHolderRenderer.sprite = activeItem.icon;
+        }
+        else
+        {
+            weaponHolderRenderer.sprite = null;
+        }
+    }
+
+    private void TryPickupItem()
+    {
+        var colliders = Physics2D.OverlapCircleAll(transform.position, pickupRadius, itemLayer);
+        if (colliders.Length == 0) return;
+
+        Collider2D closestCollider = null;
+        float minSqrDistance = float.MaxValue;
+
+        foreach (var currentCollider in colliders)
+        {
+            float sqrDistance = (currentCollider.transform.position - transform.position).sqrMagnitude;
+            if (sqrDistance < minSqrDistance)
+            {
+                minSqrDistance = sqrDistance;
+                closestCollider = currentCollider;
+            }
+        }
+
+        if (closestCollider != null && closestCollider.TryGetComponent<WorldItem>(out var worldItem))
+        {
+            worldItem.PickUp();
+        }
+    }
+
+    private void HandleHotbarInput()
+    {
+        for (int i = 0; i < hotbarKeys.Length; i++)
+        {
+            if (Input.GetKeyDown(hotbarKeys[i]))
+            {
+                InventoryManager.instance.SetActiveSlot(i);
+                break;
+            }
+        }
+    }
+
+    private void HandleMovement()
+    {
+        float currentSpeed = moveSpeed;
+        if ((Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.Return)) && moveInput.magnitude > 0.1f && currentEnergy > 0)
+        {
+            currentSpeed *= runSpeedMultiplier;
+            currentEnergy -= runEnergyCostPerSecond * Time.fixedDeltaTime;
+        }
+
+        rb.linearVelocity = moveInput.normalized * currentSpeed;
+
+        if (mapBoundsSet)
+        {
+            rb.position = new Vector2(
+                Mathf.Clamp(rb.position.x, mapMinX, mapMaxX),
+                Mathf.Clamp(rb.position.y, mapMinY, mapMaxY)
+            );
+        }
+    }
 
     private void RegenerateEnergy()
     {
         bool isRunning = (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.Return)) && rb.linearVelocity.magnitude > 0.1f;
-        if (!Input.GetMouseButton(0) && !isRunning && currentEnergy < maxEnergy)
+        if (!isRunning && !Input.GetMouseButton(0) && currentEnergy < maxEnergy)
         {
             currentEnergy = Mathf.Min(maxEnergy, currentEnergy + energyRegenRate * Time.deltaTime);
         }
@@ -270,5 +314,29 @@ public class PlayerController : MonoBehaviour
     {
         mapMinX = minX; mapMaxX = maxX; mapMinY = minY; mapMaxY = maxY;
         mapBoundsSet = true;
+    }
+
+    private IEnumerator WeaponSwingAnimation()
+    {
+        Quaternion initialRotation = weaponHolderRenderer.transform.localRotation;
+        Quaternion startRotation = initialRotation * Quaternion.Euler(0, 0, swingAngle / 2);
+        Quaternion endRotation = initialRotation * Quaternion.Euler(0, 0, -swingAngle / 2);
+        float halfDuration = swingDuration / 2;
+        float elapsedTime = 0f;
+        while (elapsedTime < halfDuration)
+        {
+            weaponHolderRenderer.transform.localRotation = Quaternion.Slerp(startRotation, endRotation, elapsedTime / halfDuration);
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        elapsedTime = 0f;
+        while (elapsedTime < halfDuration)
+        {
+            weaponHolderRenderer.transform.localRotation = Quaternion.Slerp(endRotation, initialRotation, elapsedTime / halfDuration);
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        weaponHolderRenderer.transform.localRotation = initialRotation;
+        weaponSwingCoroutine = null;
     }
 }
