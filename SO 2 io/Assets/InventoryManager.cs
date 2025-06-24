@@ -127,12 +127,10 @@ public class InventoryManager : MonoBehaviour
         }
         PlayerController player = FindObjectOfType<PlayerController>();
         if (player == null) return;
-
         Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         mousePos.z = 0;
         Vector3 playerPos = player.transform.position;
         Vector3 spawnPos = playerPos + (mousePos - playerPos).normalized * 1.5f;
-
         GameObject itemObject = Instantiate(worldItemPrefab, spawnPos, Quaternion.identity);
 
         WorldItem worldItem = itemObject.GetComponent<WorldItem>();
@@ -147,7 +145,6 @@ public class InventoryManager : MonoBehaviour
                 sr.sortingLayerName = "Items";
             }
         }
-
         slots[slotIndex].Clear();
         onInventoryChangedCallback?.Invoke();
     }

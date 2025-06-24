@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Linq;
 using TMPro;
+using System.Collections;
 
 public class PlayerController : MonoBehaviour
 {
@@ -15,6 +16,10 @@ public class PlayerController : MonoBehaviour
     public float attackCooldown = 0.5f;
     public int attackEnergyCost = 5;
 
+    [Header("Анімація Атаки")]
+    public float swingAngle = 75f;
+    public float swingDuration = 0.2f;
+
     [Header("Взаємодія")]
     public KeyCode pickupKey = KeyCode.E;
     public float pickupRadius = 1.5f;
@@ -26,11 +31,12 @@ public class PlayerController : MonoBehaviour
     public int maxEnergy = 100;
     public float energyRegenRate = 10f;
 
-    [Header("UI Елементи")]
+    [Header("UI та Візуальні Елементи")]
     public TextMeshProUGUI healthText;
     public Image healthFillImage;
     public TextMeshProUGUI energyText;
     public Image energyFillImage;
+    public SpriteRenderer weaponHolderRenderer;
 
     private Rigidbody2D rb;
     private Camera mainCamera;
@@ -38,6 +44,7 @@ public class PlayerController : MonoBehaviour
     private Vector2 moveInput;
     private float mapMinX, mapMaxX, mapMinY, mapMaxY;
     private bool mapBoundsSet = false;
+    private Coroutine weaponSwingCoroutine;
 
     void Awake()
     {
@@ -45,6 +52,23 @@ public class PlayerController : MonoBehaviour
         mainCamera = Camera.main;
         currentHealth = maxHealth;
         currentEnergy = maxEnergy;
+    }
+
+    void Start()
+    {
+        if (InventoryManager.instance != null)
+        {
+            InventoryManager.instance.onInventoryChangedCallback += UpdateHeldItemVisual;
+        }
+        UpdateHeldItemVisual();
+    }
+
+    void OnDestroy()
+    {
+        if (InventoryManager.instance != null)
+        {
+            InventoryManager.instance.onInventoryChangedCallback -= UpdateHeldItemVisual;
+        }
     }
 
     void Update()
@@ -78,6 +102,20 @@ public class PlayerController : MonoBehaviour
         HandleHotbarInput();
     }
 
+    private void UpdateHeldItemVisual()
+    {
+        if (weaponHolderRenderer == null) return;
+        Item activeItem = InventoryManager.instance.GetActiveItem();
+        if (activeItem != null && activeItem.itemType == ItemType.Tool)
+        {
+            weaponHolderRenderer.sprite = activeItem.icon;
+        }
+        else
+        {
+            weaponHolderRenderer.sprite = null;
+        }
+    }
+
     private void PerformAttack()
     {
         if (currentEnergy < attackEnergyCost) return;
@@ -95,15 +133,55 @@ public class PlayerController : MonoBehaviour
         if (activeItem != null && activeItem.itemType == ItemType.Tool)
         {
             currentDamage = activeItem.damage;
-        }
-
-        foreach (var hit in hits)
-        {
-            if (hit.TryGetComponent<ResourceSource>(out ResourceSource resource))
+            if (weaponHolderRenderer != null && weaponSwingCoroutine == null)
             {
-                resource.TakeDamage(currentDamage);
+                weaponSwingCoroutine = StartCoroutine(WeaponSwingAnimation());
             }
         }
+
+        // --- ЗМІНА: Тепер перевіряємо не тільки ресурси, а й мобів ---
+        foreach (var hit in hits)
+        {
+            // Спочатку перевіряємо, чи це моб
+            if (hit.TryGetComponent<MobController>(out MobController mob))
+            {
+                mob.TakeDamage(currentDamage);
+            }
+            // Якщо не моб, перевіряємо, чи це ресурс
+            else if (hit.TryGetComponent<ResourceSource>(out ResourceSource resource))
+            {
+                resource.TakeDamage(currentDamage, transform);
+            }
+        }
+    }
+
+    private IEnumerator WeaponSwingAnimation()
+    {
+        Quaternion initialRotation = weaponHolderRenderer.transform.localRotation;
+        Quaternion startRotation = initialRotation * Quaternion.Euler(0, 0, swingAngle / 2);
+        Quaternion endRotation = initialRotation * Quaternion.Euler(0, 0, -swingAngle / 2);
+
+        float halfDuration = swingDuration / 2;
+        float elapsedTime = 0f;
+
+        while (elapsedTime < halfDuration)
+        {
+            weaponHolderRenderer.transform.localRotation = Quaternion.Slerp(startRotation, endRotation, elapsedTime / halfDuration);
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        elapsedTime = 0f;
+
+        while (elapsedTime < halfDuration)
+        {
+            weaponHolderRenderer.transform.localRotation = Quaternion.Slerp(endRotation, initialRotation, elapsedTime / halfDuration);
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        weaponHolderRenderer.transform.localRotation = initialRotation;
+        weaponSwingCoroutine = null;
     }
 
     private void TryPickupItem()
@@ -150,6 +228,26 @@ public class PlayerController : MonoBehaviour
         Vector2 lookDirection = mouseWorldPosition - transform.position;
         rb.rotation = Mathf.Atan2(lookDirection.y, lookDirection.x) * Mathf.Rad2Deg + 90f;
     }
+
+    // --- ДОДАНО: Метод для отримання шкоди ---
+    public void TakeDamage(float amount)
+    {
+        currentHealth -= amount;
+        Debug.Log($"Гравець отримав {amount} шкоди, залишилось {currentHealth} HP");
+        if (currentHealth <= 0)
+        {
+            currentHealth = 0;
+            Die();
+        }
+        UpdateUI();
+    }
+
+    private void Die()
+    {
+        Debug.Log("Гравець помер!");
+        // TODO: Логіка смерті, наприклад, перезапуск сцени
+    }
+    // ------------------------------------------
 
     private void RegenerateEnergy()
     {

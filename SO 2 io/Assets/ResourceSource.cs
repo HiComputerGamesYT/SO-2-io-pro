@@ -1,72 +1,66 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Collider2D))]
 public class ResourceSource : MonoBehaviour
 {
-    [Header("Налаштування Ресурсу")]
-    [Tooltip("Максимальне здоров'я ресурсу (наприклад, 100 для дерева).")]
+    [Header("Налаштування здоров'я")]
     public float maxHealth = 100f;
 
-    [Header("Лут (що випадає)")]
-    [Tooltip("Предмет, який випадає.")]
+    [Header("Налаштування видобутку")]
     public Item lootItem;
-
-    [Tooltip("Шанс випадіння 1 одиниці луту при кожному ударі.")]
+    public int lootQuantityOnDestroy = 5;
     [Range(0f, 1f)]
-    public float dropChanceOnHit = 0.3f; // 30% шанс
-
-    [Tooltip("Кількість предметів, які гарантовано випадають при знищенні.")]
-    public int dropQuantityOnDestroy = 5;
+    public float dropOnHitChance = 0.5f;
 
     private float currentHealth;
 
     void Start()
     {
         currentHealth = maxHealth;
-        // Переконаємось, що колайдер не є тригером, щоб він був фізичною перешкодою
-        GetComponent<Collider2D>().isTrigger = false;
     }
 
-    /// <summary>
-    /// Метод для нанесення шкоди ресурсу.
-    /// </summary>
-    /// <param name="damageAmount">Кількість шкоди.</param>
-    public void TakeDamage(float damageAmount)
+    // Тепер цей метод приймає інформацію про того, хто завдав шкоди
+    public void TakeDamage(float damage, Transform damageDealer)
     {
-        currentHealth -= damageAmount;
-        Debug.Log($"<color=orange>{gameObject.name} отримав {damageAmount} шкоди. Залишилось здоров'я: {currentHealth}/{maxHealth}</color>");
+        if (currentHealth <= 0) return;
 
-        // Шанс отримати лут при ударі
-        if (Random.value <= dropChanceOnHit)
+        currentHealth -= damage;
+
+        if (Random.value < dropOnHitChance)
         {
-            SpawnLoot(1);
-            Debug.Log($"<color=green>Випав 1 {lootItem.itemName} при ударі!</color>");
+            // Передаємо інформацію про гравця далі
+            SpawnLoot(1, damageDealer);
         }
 
         if (currentHealth <= 0)
         {
-            Die();
+            Die(damageDealer);
         }
     }
 
-    /// <summary>
-    /// Метод, що викликається при знищенні ресурсу.
-    /// </summary>
-    private void Die()
+    private void Die(Transform damageDealer)
     {
-        Debug.Log($"<color=red>{gameObject.name} знищено!</color>");
-        // Гарантований лут при знищенні
-        SpawnLoot(dropQuantityOnDestroy);
+        // Передаємо інформацію про гравця далі
+        SpawnLoot(lootQuantityOnDestroy, damageDealer);
         Destroy(gameObject);
     }
 
-    private void SpawnLoot(int quantity)
+    // Тепер цей метод знає, де знаходиться гравець
+    private void SpawnLoot(int quantity, Transform damageDealer)
     {
         if (lootItem == null || InventoryManager.instance.worldItemPrefab == null) return;
 
-        GameObject droppedLoot = Instantiate(InventoryManager.instance.worldItemPrefab, transform.position, Quaternion.identity);
+        // --- ВИРІШЕННЯ ПРОБЛЕМИ ---
+        // Створюємо об'єкт біля гравця, а не біля дерева
+        Vector3 spawnPosition = damageDealer.position + (Vector3)Random.insideUnitCircle * 0.5f;
+        GameObject itemObject = Instantiate(InventoryManager.instance.worldItemPrefab, spawnPosition, Quaternion.identity);
 
-        WorldItem worldItem = droppedLoot.GetComponent<WorldItem>();
+        SpriteRenderer sr = itemObject.GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            sr.sortingLayerName = "Items";
+        }
+
+        WorldItem worldItem = itemObject.GetComponent<WorldItem>();
         if (worldItem != null)
         {
             worldItem.itemData = lootItem;

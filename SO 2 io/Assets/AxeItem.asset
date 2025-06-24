@@ -17,4 +17,4 @@ MonoBehaviour:
   icon: {fileID: 1764731346183631569, guid: 4409eaeddc6424044bbfa656c96ccc60, type: 3}
   maxStack: 99
   itemType: 1
-  damage: 10
+  damage: 25
