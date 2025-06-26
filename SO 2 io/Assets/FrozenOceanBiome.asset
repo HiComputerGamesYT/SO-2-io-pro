@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0bff7e9fb97db5f4cab51f0ce6ce3307, type: 3}
+  m_Name: FrozenOceanBiome
+  m_EditorClassIdentifier: 
+  biomeType: 5
+  primaryTileChance: 0.8
+  primaryTile: {fileID: 11400000, guid: 1c21d273ccb159040bd587ac96678e97, type: 2}
+  secondaryTile: {fileID: 11400000, guid: e34ee0ba0b0c4bf4a8e1bd3119239822, type: 2}
+  biomeMusic: {fileID: 8300000, guid: 41a4e60c5ed867842a2c8ddf416a54c1, type: 3}
+  spawnableResources: []
+  spawnableMobs: []

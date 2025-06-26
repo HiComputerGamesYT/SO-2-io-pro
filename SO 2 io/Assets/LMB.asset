@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6db6a5bf6c096c4f9f3cf6846b399fc, type: 3}
+  m_Name: LMB
+  m_EditorClassIdentifier: 
+  locationName: "\u0412\u0443\u043B\u043A\u0430\u043D"
+  locationPrefab: {fileID: 0}
+  groundTiles:
+  - {fileID: 11400000, guid: 408394f10923b444986dbf57ddf083ea, type: 2}
+  - {fileID: 11400000, guid: 2ac5fb11f2b4e2548901a9149dd8a0db, type: 2}
+  liquidTile: {fileID: 11400000, guid: 738056dac5bf6d44e81f729052ea649d, type: 2}
+  liquidTileChance: 0.942
+  miniLocationNoiseScale: 0.01
+  miniLocationNoiseSeedOffset: 54321
+  liquidPlacementStyle: 1
+  liquidShapeNoiseScale: 0.08
+  liquidShapeNoiseSeedOffset: 67890
+  liquidShapeThreshold: 0.5
+  isCircular: 1
+  minSize: 50
+  maxSize: 50
+  allowedBiomes: 
+  spawnableResources:
+  - worldItemPrefab: {fileID: 0}
+    itemData: {fileID: 11400000, guid: 125dbe4202429ef4bb47a524e5abfbaf, type: 2}
+    spawnChance: 1
+    initialAmount: 5
+  spawnableMobs:
+  - mobPrefab: {fileID: 0}
+    initialSpawnCount: 0
+    maxMobsInBiome: 0
+  locationMusic: {fileID: 8300000, guid: 2e94af185da607240b69bdc5b99b2d02, type: 3}
+  musicDetectionRadius: 50
+  randomSpawnChance: 1
+  maxRandomSpawns: 1

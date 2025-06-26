@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6db6a5bf6c096c4f9f3cf6846b399fc, type: 3}
+  m_Name: MountainMiniLocation
+  m_EditorClassIdentifier: 
+  locationName: Mountain
+  locationPrefab: {fileID: 0}
+  groundTiles:
+  - {fileID: 11400000, guid: 2e3a06c759c9fe445b913be53d4e6c26, type: 2}
+  - {fileID: 11400000, guid: 029f608b53193fc4083e0577cc84aee0, type: 2}
+  liquidTile: {fileID: 11400000, guid: e15af20e0089aa84cadcccf75bd3139d, type: 2}
+  liquidTileChance: 0.8
+  miniLocationNoiseScale: 0.1
+  miniLocationNoiseSeedOffset: 54321
+  liquidPlacementStyle: 1
+  liquidShapeNoiseScale: 0.08
+  liquidShapeNoiseSeedOffset: 67890
+  liquidShapeThreshold: 0.5
+  isCircular: 1
+  minSize: 50
+  maxSize: 50
+  allowedBiomes: 0800000009000000
+  spawnableResources: []
+  spawnableMobs: []
+  locationMusic: {fileID: 8300000, guid: 2e94af185da607240b69bdc5b99b2d02, type: 3}
+  musicDetectionRadius: 10
+  randomSpawnChance: 1
+  maxRandomSpawns: 1

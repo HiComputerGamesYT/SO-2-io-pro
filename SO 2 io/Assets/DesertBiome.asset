@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0bff7e9fb97db5f4cab51f0ce6ce3307, type: 3}
+  m_Name: DesertBiome
+  m_EditorClassIdentifier: 
+  biomeType: 13
+  primaryTileChance: 0.8
+  primaryTile: {fileID: 11400000, guid: 1481eb61f2629974888f765e9b41cfe1, type: 2}
+  secondaryTile: {fileID: 11400000, guid: d09f416e2e05b214e802b833c319143a, type: 2}
+  biomeMusic: {fileID: 8300000, guid: f684467b8735200458008b8a0d42e894, type: 3}
+  spawnableResources: []
+  spawnableMobs: []

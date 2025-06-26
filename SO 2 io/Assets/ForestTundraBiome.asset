@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0bff7e9fb97db5f4cab51f0ce6ce3307, type: 3}
+  m_Name: ForestTundraBiome
+  m_EditorClassIdentifier: 
+  biomeType: 6
+  primaryTileChance: 0.8
+  primaryTile: {fileID: 11400000, guid: edadf18b90e1ccc41bf8e5df86386b00, type: 2}
+  secondaryTile: {fileID: 11400000, guid: 341846559dc1601488ccd315a070c4b3, type: 2}
+  biomeMusic: {fileID: 8300000, guid: 7ef6d57dc912cba42a01d3a9c1ec4c5a, type: 3}
+  spawnableResources: []
+  spawnableMobs: []

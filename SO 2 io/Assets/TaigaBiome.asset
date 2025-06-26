@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0bff7e9fb97db5f4cab51f0ce6ce3307, type: 3}
+  m_Name: TaigaBiome
+  m_EditorClassIdentifier: 
+  biomeType: 7
+  primaryTileChance: 0.8
+  primaryTile: {fileID: 11400000, guid: eb217761385bf4848b9a8a57a70a5dbd, type: 2}
+  secondaryTile: {fileID: 11400000, guid: 57fc083c9d0187b40a393d2ce1e045c7, type: 2}
+  biomeMusic: {fileID: 8300000, guid: 04f547786f690fd40b416350e8e39bf6, type: 3}
+  spawnableResources: []
+  spawnableMobs: []
